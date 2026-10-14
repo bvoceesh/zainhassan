@@ -1,0 +1,10 @@
+.hearth-data/
+.hearth-data/**
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+node_modules/
+__pycache__/
+
