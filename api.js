@@ -50,6 +50,7 @@
     me: () => request('/api/me'),
     register: body => request('/api/register', { method: 'POST', body }),
     login: body => request('/api/login', { method: 'POST', body }),
+    resetPassword: body => request('/api/password-reset', { method: 'POST', body }),
     logout: () => request('/api/logout', { method: 'POST', body: {} }),
     dashboard: () => request('/api/dashboard'),
     patients: () => request('/api/patients'),

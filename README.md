@@ -13,7 +13,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 Open [http://127.0.0.1:8787](http://127.0.0.1:8787). Keep the PowerShell window open while using the app; press Ctrl+C there to stop the service. The execution-policy setting applies only to that PowerShell process.
 
-Register from the Sign in dialog and choose a role. Accounts require a name, email, and password of at least 10 characters. Patient, volunteer, clinician, and care-unit workflows are backed by the local API. The signed-out dashboard is demo content.
+Register from the Sign in dialog and choose a role. Accounts require a name, email, and password of at least 10 characters. If you forget a password, use the Forgot password link in the sign-in dialog to set a replacement on this device. Patient, volunteer, clinician, and care-unit workflows are backed by the local API. The signed-out dashboard is demo content.
 
 ## Local storage
 

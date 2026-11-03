@@ -140,8 +140,11 @@
   function showAuth() {
     authModal = function(mode = 'login') {
       const registering = mode === 'register';
+      const recovering = mode === 'recover';
       const roles = `<option value="patient" ${state.role === 'patient' ? 'selected' : ''}>Patient or family member</option><option value="volunteer" ${state.role === 'volunteer' ? 'selected' : ''}>Volunteer</option><option value="doctor" ${state.role === 'doctor' ? 'selected' : ''}>Clinician</option><option value="unit" ${state.role === 'unit' ? 'selected' : ''}>Palliative care unit</option>`;
-      openModal(registering ? 'Create your Hearth account' : 'Sign in to Hearth', `<div class="auth-modes"><button class="auth-mode ${registering ? '' : 'active'}" data-auth-mode="login">Sign in</button><button class="auth-mode ${registering ? 'active' : ''}" data-auth-mode="register">Create account</button></div>${registering ? `<div class="form-field"><label for="auth-name">Your name</label><input id="auth-name" required minlength="2" maxlength="100" value="${esc(state.userName)}"></div>` : `<input id="auth-name" type="hidden" value="${esc(state.userName)}">`}<div class="form-field"><label for="auth-email">Email address</label><input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></div><div class="form-field"><label for="auth-password">Password</label><input id="auth-password" type="password" required minlength="10" autocomplete="${registering ? 'new-password' : 'current-password'}" placeholder="At least 10 characters"></div>${registering ? `<div class="form-field"><label for="auth-role">I’m joining as</label><select id="auth-role">${roles}</select></div>` : `<input id="auth-role" type="hidden" value="${state.role}">`}<div class="form-hint">This local app stores password hashes on this device. Do not use a real password or patient information.</div>`, 'Continue');
+      const title = recovering ? 'Recover your password' : (registering ? 'Create your Hearth account' : 'Sign in to Hearth');
+      const formBody = recovering ? `<input id="auth-mode-type" type="hidden" value="recover"><div class="form-field"><label for="auth-email">Email address</label><input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></div><div class="form-field"><label for="auth-password">New password</label><input id="auth-password" type="password" required minlength="10" autocomplete="new-password" placeholder="At least 10 characters"></div><div class="form-field"><label for="auth-confirm-password">Confirm password</label><input id="auth-confirm-password" type="password" required minlength="10" autocomplete="new-password" placeholder="Re-enter your password"></div><div class="form-hint">This local demo resets the password on this device. Use the account email to set a replacement password.</div>` : `<input id="auth-mode-type" type="hidden" value="${registering ? 'register' : 'login'}">${registering ? `<div class="form-field"><label for="auth-name">Your name</label><input id="auth-name" required minlength="2" maxlength="100" value="${esc(state.userName)}"></div>` : `<input id="auth-name" type="hidden" value="${esc(state.userName)}">`}<div class="form-field"><label for="auth-email">Email address</label><input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></div><div class="form-field"><label for="auth-password">Password</label><input id="auth-password" type="password" required minlength="10" autocomplete="${registering ? 'new-password' : 'current-password'}" placeholder="At least 10 characters"></div>${registering ? `<div class="form-field"><label for="auth-role">I’m joining as</label><select id="auth-role">${roles}</select></div>` : `<input id="auth-role" type="hidden" value="${state.role}"><div class="form-row-inline"><button class="auth-link" type="button" data-auth-mode="recover">Forgot password?</button></div>`}<div class="form-hint">This local app stores password hashes on this device. Do not use a real password or patient information.</div>`;
+      openModal(title, `<div class="auth-modes"><button class="auth-mode ${registering ? '' : 'active'}" data-auth-mode="login">Sign in</button><button class="auth-mode ${registering ? 'active' : ''}" data-auth-mode="register">Create account</button></div>${formBody}`, recovering ? 'Update password' : 'Continue');
     };
   }
 
@@ -152,16 +155,31 @@
     const submit = event.target.closest('[data-action="modal-submit"]');
     if (submit && document.getElementById('auth-email')) {
       event.preventDefault(); event.stopPropagation();
-      const registering = document.getElementById('auth-role').type !== 'hidden';
-      const body = { email: document.getElementById('auth-email').value.trim(), password: document.getElementById('auth-password').value };
+      const authMode = document.getElementById('auth-mode-type') ? document.getElementById('auth-mode-type').value : 'login';
+      const registering = authMode === 'register';
+      const recovering = authMode === 'recover';
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      if (recovering) {
+        const confirmPassword = document.getElementById('auth-confirm-password').value;
+        if (password.length < 10 || confirmPassword.length < 10) { toast('Use a password with at least 10 characters.'); return; }
+        if (password !== confirmPassword) { toast('The new password and confirmation do not match.'); return; }
+      }
+      const body = { email, password };
       if (registering) { body.name = document.getElementById('auth-name').value.trim(); body.role = document.getElementById('auth-role').value; }
       await perform(async () => {
+        if (recovering) {
+          await window.hearthApi.resetPassword({ email, password });
+          closeModal();
+          authModal('login');
+          return;
+        }
         const result = registering ? await window.hearthApi.register(body) : await window.hearthApi.login(body);
         setUser(result.user);
         await refreshRemote();
         closeModal();
         render();
-      }, registering ? 'Account created on this device.' : 'Signed in.');
+      }, recovering ? 'Password updated. You can sign in with your new password.' : (registering ? 'Account created on this device.' : 'Signed in.'));
       return;
     }
 
@@ -170,7 +188,7 @@
     const action = button.dataset.action;
     if (action === 'auth' && state.authenticated) {
       event.preventDefault(); event.stopPropagation();
-      await perform(async () => { await window.hearthApi.logout(); state.authenticated = false; state.userId = null; state.userName = 'Alex Morgan'; state.role = 'patient'; state.page = 'Overview'; state.remoteData = null; state.files = [{ name: 'Medication list.pdf', type: 'Medication', date: 'Today' }, { name: 'Dr. Patel visit notes.pdf', type: 'Visit notes', date: 'Oct 11' }, { name: 'Nutrition plan.pdf', type: 'Care plan', date: 'Oct 08' }]; render(); }, 'Signed out.');
+      await perform(async () => { await window.hearthApi.logout(); state.authenticated = false; state.userId = null; state.userName = ''; state.role = 'patient'; state.page = 'Overview'; state.remoteData = null; state.backendAppointments = []; state.backendRequests = []; state.backendAvailability = []; state.backendMedications = []; state.backendPatients = []; state.backendFiles = []; state.files = []; state.backendDietPlan = null; state.available = false; render(); }, 'Signed out.');
       return;
     }
     if (!state.authenticated) return;
@@ -270,10 +288,13 @@
     const originalContentRender = contentRender;
     contentRender = function() {
       if (!state.authenticated) {
-        const result = originalContentRender();
+        const content = document.getElementById('content');
+        if (content) {
+          content.innerHTML = '<div class="card"><div class="empty-state">Sign in or create an account to view your care workspace.</div></div>';
+        }
         const accountButton = document.querySelector('.account-btn');
         if (accountButton) accountButton.textContent = 'Sign in';
-        return result;
+        return;
       }
       renderConnectedContent();
     };
@@ -284,8 +305,10 @@
       render();
     } catch (error) {
       state.authenticated = false;
+      state.userName = '';
       const accountButton = document.querySelector('.account-btn');
       if (accountButton) accountButton.textContent = 'Sign in';
+      render();
     }
   });
 })();

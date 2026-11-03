@@ -199,6 +199,29 @@ function Handle-Request($Context) {
         return
     }
 
+    if ($path -eq '/api/password-reset' -and $method -eq 'POST') {
+        $body = Read-Body $Context
+        $email = ([string]$body.email).Trim().ToLowerInvariant()
+        $newPassword = [string]$body.password
+        if ($email -notmatch '^[^\s@]+@[^\s@]+\.[^\s@]+$' -or $newPassword.Length -lt 10 -or $newPassword.Length -gt 200) {
+            Send-Error $Context 400 'Enter a valid email and a password with at least 10 characters.'
+            return
+        }
+        $db = Read-Database
+        $user = @($db.users | Where-Object { $_.email -eq $email } | Select-Object -First 1)
+        if ($user.Count -eq 0) { Send-Error $Context 404 'No account was found for that email.'; return }
+        $saltBytes = New-Object byte[] 16
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        $rng.GetBytes($saltBytes)
+        $rng.Dispose()
+        $salt = [Convert]::ToBase64String($saltBytes)
+        $user[0].salt = $salt
+        $user[0].passwordHash = Get-PasswordHash $newPassword $salt
+        Write-Database $db
+        Send-Json $Context @{ ok = $true; message = 'Password updated. You can sign in with your new password.' }
+        return
+    }
+
     $db = Read-Database
     $user = Get-SessionUser $Context $db
 
